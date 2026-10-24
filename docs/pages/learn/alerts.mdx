@@ -1,12 +1,12 @@
 # Alerts
 
-Alerts notify you when conditions in your application require attention: errors, latency spikes, metric thresholds, or missing data. Configure channels and rules to get notified through email, Slack, webhooks, GitHub Issues, Pushover, or Telegram, or to page whoever is [on call](/learn/on-call).
+Alerts notify you when conditions in your application require attention: errors, latency spikes, metric thresholds, or missing data. Configure channels and rules to get notified through email, Slack, webhooks, GitHub Issues, GitLab Issues, Pushover, or Telegram, or to page whoever is [on call](/learn/on-call).
 
 ## How Alerts Work
 
 The alerting system has two parts:
 
-- **Channels** define where notifications are delivered (email, Slack, webhook, GitHub, Pushover, Telegram, or an escalation policy)
+- **Channels** define where notifications are delivered (email, Slack, webhook, GitHub, GitLab, Pushover, Telegram, or an escalation policy)
 - **Rules** define what conditions trigger a notification
 
 When a rule's condition is met, Traceway sends a notification through the rule's attached channel. Each rule is linked to exactly one channel, but a channel can be used by multiple rules.
@@ -20,6 +20,7 @@ A channel represents a notification destination. Traceway supports the following
 | Email   | Sends an email to one or more recipients | List of email addresses |
 | Slack   | Posts a message to a Slack channel via incoming webhook | Webhook URL |
 | Webhook | Sends an HTTP POST with a JSON payload to any URL | URL, optional headers, optional HMAC secret |
+| GitLab  | Creates a GitLab issue in a project | Instance URL, access token, project ID or path, optional labels |
 | GitHub  | Creates a GitHub issue in a repository | Personal access token, repository owner/name, optional labels |
 | Pushover | Sends push notifications to your mobile devices | User Key, App Token |
 | Telegram | Sends a message via a Telegram bot to a user or group chat | Bot Token, Chat ID |
@@ -52,6 +53,18 @@ Then configure the Slack channel in Traceway:
 | Username | No | Override the bot display name (defaults to your Slack app name) |
 
 <img src="/channel-slack.png" alt="Slack channel configuration dialog" style={{ maxWidth: '100%', height: 'auto', marginTop: '16px', borderRadius: '8px', border: '1px solid #e5e7eb' }} />
+
+### Setting Up GitLab
+
+The GitLab channel creates an issue each time a notification is delivered. It supports GitLab.com and self-managed GitLab instances.
+
+1. Create a personal or project access token with the `api` scope and permission to create issues in the target project.
+2. Create a channel with type **GitLab**.
+3. Enter the **GitLab Instance URL** (defaults to `https://gitlab.com`). For a self-managed instance, include any installation subpath, but omit `/api/v4`.
+4. Enter the **Access Token** and **Project ID or Path** (for example, `123` or `group/subgroup/project`; do not URL-encode the path).
+5. Optionally enter comma-separated labels, then save the channel and attach it to a rule.
+
+Testing the channel creates a real issue. Issue titles and descriptions use the same alert content as the GitHub channel. Delivery uses the notification outbox and its retry policy; an ambiguous network failure can result in a duplicate issue. This integration creates issues only; it does not run the GitHub Auto-Fix workflow.
 
 ### Setting Up GitHub
 

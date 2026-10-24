@@ -43,6 +43,10 @@
 	let slackWebhookUrl = $state('');
 	let slackChannel = $state('');
 	let slackUsername = $state('');
+	let gitlabBaseUrl = $state('https://gitlab.com');
+	let gitlabToken = $state('');
+	let gitlabProjectId = $state('');
+	let gitlabLabels = $state('');
 	let githubToken = $state('');
 	let githubOwner = $state('');
 	let githubRepo = $state('');
@@ -70,6 +74,7 @@
 		{ value: 'webhook', label: 'Webhook' },
 		{ value: 'slack', label: 'Slack' },
 		{ value: 'github', label: 'GitHub' },
+		{ value: 'gitlab', label: 'GitLab' },
 		{ value: 'pushover', label: 'Pushover' },
 		{ value: 'telegram', label: 'Telegram' },
 		{ value: 'escalation', label: 'Escalation policy' }
@@ -106,6 +111,10 @@
 		slackWebhookUrl = '';
 		slackChannel = '';
 		slackUsername = '';
+		gitlabBaseUrl = 'https://gitlab.com';
+		gitlabToken = '';
+		gitlabProjectId = '';
+		gitlabLabels = '';
 		githubToken = '';
 		githubOwner = '';
 		githubRepo = '';
@@ -147,6 +156,11 @@
 			slackWebhookUrl = config.webhookUrl || '';
 			slackChannel = config.channel || '';
 			slackUsername = config.username || '';
+		} else if (ch.channelType === 'gitlab') {
+			gitlabBaseUrl = config.baseUrl || 'https://gitlab.com';
+			gitlabToken = config.token || '';
+			gitlabProjectId = config.projectId || '';
+			gitlabLabels = (config.labels || []).join(', ');
 		} else if (ch.channelType === 'github') {
 			githubToken = config.token || '';
 			githubOwner = config.owner || '';
@@ -189,6 +203,16 @@
 			if (slackChannel) config.channel = slackChannel;
 			if (slackUsername) config.username = slackUsername;
 			return config;
+		} else if (channelType === 'gitlab') {
+			return {
+				baseUrl: gitlabBaseUrl.trim(),
+				token: gitlabToken,
+				projectId: gitlabProjectId.trim(),
+				labels: gitlabLabels
+					.split(',')
+					.map((label) => label.trim())
+					.filter(Boolean)
+			};
 		} else if (channelType === 'github') {
 			const config: NotificationChannelConfig = {
 				token: githubToken,
@@ -427,6 +451,27 @@
 				<div class="space-y-2">
 					<Label for="slack-username">Username (optional)</Label>
 					<Input id="slack-username" bind:value={slackUsername} placeholder="Traceway" />
+				</div>
+			{:else if channelType === 'gitlab'}
+				<div class="space-y-2">
+					<Label for="gl-url">GitLab Instance URL</Label>
+					<Input id="gl-url" bind:value={gitlabBaseUrl} placeholder="https://gitlab.com" />
+				</div>
+				<div class="space-y-2">
+					<Label for="gl-token">Access Token</Label>
+					<Input id="gl-token" type="password" bind:value={gitlabToken} placeholder="glpat-..." />
+					<p class="text-sm text-muted-foreground">
+						Use a personal or project access token with the api scope and permission to create
+						issues.
+					</p>
+				</div>
+				<div class="space-y-2">
+					<Label for="gl-project">Project ID or Path</Label>
+					<Input id="gl-project" bind:value={gitlabProjectId} placeholder="123 or group/project" />
+				</div>
+				<div class="space-y-2">
+					<Label for="gl-labels">Labels (optional, comma-separated)</Label>
+					<Input id="gl-labels" bind:value={gitlabLabels} placeholder="bug, traceway" />
 				</div>
 			{:else if channelType === 'github'}
 				<div class="space-y-2">

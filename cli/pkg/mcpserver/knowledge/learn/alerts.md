@@ -17,6 +17,7 @@ Rules and channels belong to a project and only see that project's data. Channel
 | **Email** | 1 to 10 recipient addresses | An HTML email per alert |
 | **Slack** | Incoming webhook URL, optional channel override and username | An attachment coloured by severity: blue info, orange warning, red critical, green recovery |
 | **Webhook** | URL, method (POST or PUT), optional headers, optional HMAC secret | JSON with `subject`, `body`, `severity`, `ruleType`, `ruleName`, `url`, `timestamp`. With a secret, `X-Traceway-Signature: sha256=<hex>` |
+| **GitLab** | Instance URL (defaults to `https://gitlab.com`), personal or project access token with `api` scope and issue creation permission, project ID or unencoded path, optional labels | A GitLab issue. Supports self-managed instances, including installation subpaths. Test creates a real issue. |
 | **GitHub** | Fine-grained token with Issues read and write, owner, repo, optional labels | A GitHub issue. These issues can start the Auto-Fix agent in the repository. |
 | **Pushover** | User key and app token, optional device, priority (normal, high, or emergency with a retry of 30 s or more, an expiry up to 10800 s and an optional callback URL), sound, HTML formatting, TTL | A push notification with the dashboard link |
 | **Telegram** | Bot token and chat id | A message, cut at 4096 characters with the link kept |

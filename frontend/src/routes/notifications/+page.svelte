@@ -91,6 +91,7 @@
 		webhook: 'Webhook',
 		slack: 'Slack',
 		github: 'GitHub',
+		gitlab: 'GitLab',
 		pushover: 'Pushover',
 		telegram: 'Telegram',
 		escalation: 'Escalation policy'
@@ -98,7 +99,7 @@
 
 	const tabDescriptions: Record<string, string> = {
 		channels:
-			'Channels define where your notifications are delivered, such as Email, Slack, Webhooks, GitHub Issues, or Pushover. Create a channel first, then attach it to a rule.',
+			'Channels define where your notifications are delivered, such as Email, Slack, Webhooks, GitHub Issues, GitLab Issues, or Pushover. Create a channel first, then attach it to a rule.',
 		rules:
 			'Rules define when notifications are triggered. Each rule monitors a specific condition and sends an alert through the attached channel when that condition is met.',
 		history:

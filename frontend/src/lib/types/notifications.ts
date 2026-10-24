@@ -8,6 +8,8 @@ export type NotificationChannelConfig = {
 	channel?: string;
 	username?: string;
 	token?: string;
+	baseUrl?: string;
+	projectId?: string;
 	owner?: string;
 	repo?: string;
 	labels?: string[];

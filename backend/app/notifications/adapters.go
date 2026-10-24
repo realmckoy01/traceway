@@ -47,6 +47,12 @@ func NewAdapter(channelType string, configJSON json.RawMessage) (Adapter, error)
 			return nil, fmt.Errorf("invalid slack config: %w", err)
 		}
 		return &cfg, nil
+	case "gitlab":
+		var cfg GitLabAdapter
+		if err := json.Unmarshal(configJSON, &cfg); err != nil {
+			return nil, fmt.Errorf("invalid gitlab config: %w", err)
+		}
+		return &cfg, nil
 	case "github":
 		var cfg GitHubAdapter
 		if err := json.Unmarshal(configJSON, &cfg); err != nil {
