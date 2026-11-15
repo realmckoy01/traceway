@@ -2,7 +2,7 @@
 
 package telemetry
 
-import duckdbrepo "github.com/tracewayapp/traceway/backend/app/repositories/telemetry/duckdb"
+import duckdbrepo "github.com/tracewayapp/traceway/backend/v2/app/repositories/telemetry/duckdb"
 
 var (
 	AiTraceRepository             = duckdbrepo.AiTraceRepository
@@ -18,4 +18,5 @@ var (
 	OtelSpanRepository            = duckdbrepo.OtelSpanRepository
 	LegacyRepository              = duckdbrepo.LegacyRepository
 	TaskRepository                = duckdbrepo.TaskRepository
+	SLOBucketRepository           = duckdbrepo.SLOBucketRepository
 )

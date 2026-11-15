@@ -12,6 +12,10 @@
 	import { projectsState, isFrontendFramework } from '$lib/state/projects.svelte';
 	import { ruleTypeOptions } from './rule-types';
 	import type { NotificationChannelConfig, NotificationRuleConfig } from '$lib/types/notifications';
+	import { BURN_RATE_PRESETS } from '$lib/utils/slo-math';
+	import { SLI_KIND_LABELS, type SLO } from '$lib/state/slos.svelte';
+	import { WarningCallout } from '$lib/components/ui/warning-callout';
+	import { resolve } from '$app/paths';
 
 	interface NotificationChannel {
 		id: number;
@@ -73,6 +77,8 @@
 	let operator = $state('gt');
 	let thresholdValue = $state(90);
 	let aggregation = $state('avg');
+	let metricTags = $state('');
+	let metricGroupBy = $state('');
 	let dataType = $state('any');
 	let silenceMinutes = $state(10);
 	let thresholdCount = $state(100);
@@ -85,15 +91,83 @@
 	let thresholdCost = $state(0.5);
 	let conversationThresholdCost = $state(5);
 	let flaggedTermsFilter = $state('');
+	let sloId = $state('');
+	let longWindowMinutes = $state(60);
+	let shortWindowMinutes = $state(5);
+	let burnRateThreshold = $state(14.4);
+	let consumedPercent = $state(80);
+	let slos = $state<SLO[]>([]);
+	let slosLoaded = $state(false);
+	let slosStatus = $state<'loading' | 'loaded' | 'error'>('loading');
 
 	const isEditing = $derived(rule !== null);
+
+	const isSloRule = $derived(ruleType === 'slo_burn_rate' || ruleType === 'slo_budget_consumed');
+	const burnPreset = $derived(
+		BURN_RATE_PRESETS.find(
+			(p) =>
+				p.longWindowMinutes === longWindowMinutes &&
+				p.shortWindowMinutes === shortWindowMinutes &&
+				p.burnRateThreshold === burnRateThreshold
+		)?.id ?? 'custom'
+	);
+
+	const selectedSlo = $derived(slos.find((s) => String(s.id) === sloId));
+	const sloSliceMinutes = $derived(selectedSlo?.bucketMinutes ?? 1);
+	const roundsBurnWindows = $derived(
+		sloSliceMinutes > 1 &&
+			(shortWindowMinutes % sloSliceMinutes !== 0 || longWindowMinutes % sloSliceMinutes !== 0)
+	);
+
+	function roundUpToSlice(minutes: number): number {
+		return Math.ceil(minutes / sloSliceMinutes) * sloSliceMinutes;
+	}
+
+	async function loadSlos() {
+		slosStatus = 'loading';
+		try {
+			const response = await api.get('/slos', {
+				projectId: projectsState.currentProjectId ?? undefined
+			});
+			slos = response.slos ?? [];
+			slosStatus = 'loaded';
+		} catch {
+			slos = [];
+			slosStatus = 'error';
+		}
+	}
+
+	$effect(() => {
+		if (open && isSloRule && !slosLoaded) {
+			slosLoaded = true;
+			loadSlos();
+		}
+		if (!open) slosLoaded = false;
+	});
+
+	function windowLabel(minutes: number): string {
+		if (minutes >= 1440) return `${minutes / 1440}d`;
+		if (minutes >= 60) return `${minutes / 60}h`;
+		return `${minutes}m`;
+	}
+
+	function applyBurnPreset(id: string) {
+		const preset = BURN_RATE_PRESETS.find((p) => p.id === id);
+		if (!preset) return;
+		longWindowMinutes = preset.longWindowMinutes;
+		shortWindowMinutes = preset.shortWindowMinutes;
+		burnRateThreshold = preset.burnRateThreshold;
+	}
 
 	const isFrontendProject = $derived(
 		!!projectsState.currentProject && isFrontendFramework(projectsState.currentProject.framework)
 	);
 
+	const frontendRuleTypes = new Set(['new_error', 'slo_burn_rate', 'slo_budget_consumed']);
 	const visibleRuleTypes = $derived(
-		isFrontendProject ? [{ value: 'new_error', label: 'New Issue' }] : ruleTypeOptions
+		isFrontendProject
+			? ruleTypeOptions.filter((o) => frontendRuleTypes.has(o.value))
+			: ruleTypeOptions
 	);
 
 	$effect(() => {
@@ -120,6 +194,10 @@
 		error_regression: 'Fires when an error that was previously archived (resolved) occurs again.',
 		check_down:
 			'Fires when a monitor transitions to down (after its failure threshold), and sends a recovery notice when it comes back up. Applies to every monitor in this project.',
+		slo_burn_rate:
+			'Fires when an SLO spends its error budget faster than the threshold over both the long and the short window (multi-window burn rate), and sends a recovery notice once the burn slows down.',
+		slo_budget_consumed:
+			"Fires when an SLO has used more than the configured share of its window's error budget, and sends a recovery notice when the budget recovers.",
 		error_rate_threshold:
 			'Fires when the percentage of requests returning 5xx across all endpoints exceeds the threshold within the lookback window.',
 		error_count_threshold:
@@ -187,6 +265,8 @@
 		operator = 'gt';
 		thresholdValue = 90;
 		aggregation = 'avg';
+		metricTags = '';
+		metricGroupBy = '';
 		dataType = 'any';
 		silenceMinutes = 10;
 		thresholdCount = 100;
@@ -197,6 +277,11 @@
 		ignorePatterns = '';
 		traceName = '*';
 		thresholdCost = 0.5;
+		sloId = '';
+		longWindowMinutes = 60;
+		shortWindowMinutes = 5;
+		burnRateThreshold = 14.4;
+		consumedPercent = 80;
 	}
 
 	function populateFromRule(r: NotificationRule) {
@@ -229,6 +314,10 @@
 				operator = cfg.operator ?? 'gt';
 				thresholdValue = cfg.thresholdValue ?? 90;
 				aggregation = cfg.aggregation ?? 'avg';
+				metricTags = Object.entries(cfg.tags ?? {})
+					.map(([k, v]) => `${k}=${v}`)
+					.join(', ');
+				metricGroupBy = (cfg.groupBy ?? []).join(', ');
 				lookbackMinutes = cfg.lookbackMinutes ?? 5;
 				break;
 			case 'no_data':
@@ -279,7 +368,28 @@
 			case 'ai_flagged_content':
 				flaggedTermsFilter = (cfg.terms || []).join(', ');
 				break;
+			case 'slo_burn_rate':
+				sloId = cfg.sloId ? String(cfg.sloId) : '';
+				longWindowMinutes = cfg.longWindowMinutes ?? 60;
+				shortWindowMinutes = cfg.shortWindowMinutes ?? 5;
+				burnRateThreshold = cfg.burnRateThreshold ?? 14.4;
+				break;
+			case 'slo_budget_consumed':
+				sloId = cfg.sloId ? String(cfg.sloId) : '';
+				consumedPercent = cfg.consumedPercent ?? 80;
+				break;
 		}
+	}
+
+	function parseMetricTags(value: string): Record<string, string> {
+		const tags: Record<string, string> = {};
+		for (const part of value.split(',')) {
+			if (!part.trim()) continue;
+			const eq = part.indexOf('=');
+			const key = (eq === -1 ? part : part.slice(0, eq)).trim();
+			tags[key] = eq === -1 ? '' : part.slice(eq + 1).trim();
+		}
+		return tags;
 	}
 
 	function buildConfig(): NotificationRuleConfig {
@@ -292,7 +402,18 @@
 			case 'apdex_drop':
 				return { thresholdApdex, lookbackMinutes, minRequests };
 			case 'metric_threshold':
-				return { metricName, operator, thresholdValue, aggregation, lookbackMinutes, tags: {} };
+				return {
+					metricName,
+					operator,
+					thresholdValue,
+					aggregation,
+					lookbackMinutes,
+					tags: parseMetricTags(metricTags),
+					groupBy: metricGroupBy
+						.split(',')
+						.map((k) => k.trim())
+						.filter(Boolean)
+				};
 			case 'no_data':
 				return { dataType, silenceMinutes };
 			case 'error_count_threshold':
@@ -327,6 +448,15 @@
 					.filter((t) => t);
 				return { terms };
 			}
+			case 'slo_burn_rate':
+				return {
+					sloId: parseInt(sloId) || 0,
+					longWindowMinutes,
+					shortWindowMinutes,
+					burnRateThreshold
+				};
+			case 'slo_budget_consumed':
+				return { sloId: parseInt(sloId) || 0, consumedPercent };
 			default:
 				return {};
 		}
@@ -543,6 +673,21 @@
 						<Label for="cfg-lookback-m">Lookback (minutes)</Label>
 						<Input id="cfg-lookback-m" type="number" bind:value={lookbackMinutes} min="1" />
 					</div>
+					<div class="space-y-2">
+						<Label for="cfg-metric-tags">Tag Filters (optional, comma-separated)</Label>
+						<Input
+							id="cfg-metric-tags"
+							bind:value={metricTags}
+							placeholder="outcome=failed, host.name=web-1"
+						/>
+					</div>
+					<div class="space-y-2">
+						<Label for="cfg-metric-group-by">Group By Tags (optional, comma-separated)</Label>
+						<Input id="cfg-metric-group-by" bind:value={metricGroupBy} placeholder="host.name" />
+						<p class="text-xs text-muted-foreground">
+							Evaluates every series separately and names the breaching one in the alert.
+						</p>
+					</div>
 				{:else if ruleType === 'no_data'}
 					<div class="space-y-2">
 						<Label for="cfg-data-type">Data Type</Label>
@@ -583,6 +728,105 @@
 						<Label for="cfg-lookback-td">Lookback (minutes)</Label>
 						<Input id="cfg-lookback-td" type="number" bind:value={lookbackMinutes} min="1" />
 					</div>
+				{:else if ruleType === 'slo_burn_rate' || ruleType === 'slo_budget_consumed'}
+					<div class="space-y-2">
+						<Label>SLO</Label>
+						<Select.Root type="single" bind:value={sloId}>
+							<Select.Trigger class="w-full">
+								{slos.find((s) => String(s.id) === sloId)?.name || 'Select an SLO'}
+							</Select.Trigger>
+							<Select.Content class="max-h-64 overflow-y-auto">
+								{#each slos as s (s.id)}
+									<Select.Item value={String(s.id)} label={s.name}>
+										{s.name}
+										<span class="ml-2 text-xs text-muted-foreground">
+											{SLI_KIND_LABELS[s.sliKind]} · {s.targetPercent}% / {s.windowDays}d
+										</span>
+									</Select.Item>
+								{/each}
+							</Select.Content>
+						</Select.Root>
+						{#if slosStatus === 'error'}
+							<p class="text-xs text-destructive">
+								The SLOs could not be loaded.
+								<button
+									type="button"
+									class="underline underline-offset-2"
+									onclick={() => loadSlos()}
+								>
+									Retry
+								</button>
+							</p>
+						{:else if slosStatus === 'loaded' && slos.length === 0}
+							<p class="text-xs text-muted-foreground">
+								No SLOs in this project yet. Create one on the
+								<a class="text-primary underline-offset-2 hover:underline" href={resolve('/slos')}
+									>SLOs page</a
+								>.
+							</p>
+						{/if}
+					</div>
+					{#if ruleType === 'slo_burn_rate'}
+						<div class="space-y-2">
+							<Label>Preset</Label>
+							<div class="flex flex-wrap gap-2">
+								{#each BURN_RATE_PRESETS as preset (preset.id)}
+									<Button
+										type="button"
+										size="sm"
+										variant={burnPreset === preset.id ? 'secondary' : 'outline'}
+										onclick={() => applyBurnPreset(preset.id)}
+									>
+										{preset.label}
+										{preset.burnRateThreshold}x · {windowLabel(preset.longWindowMinutes)} / {windowLabel(
+											preset.shortWindowMinutes
+										)}
+									</Button>
+								{/each}
+							</div>
+						</div>
+						<div class="space-y-2">
+							<Label for="cfg-burn-long">Long window (minutes)</Label>
+							<Input id="cfg-burn-long" type="number" bind:value={longWindowMinutes} min="5" />
+						</div>
+						<div class="space-y-2">
+							<Label for="cfg-burn-short">Short window (minutes)</Label>
+							<Input id="cfg-burn-short" type="number" bind:value={shortWindowMinutes} min="1" />
+						</div>
+						<div class="space-y-2">
+							<Label for="cfg-burn-threshold">Burn rate threshold (x)</Label>
+							<Input
+								id="cfg-burn-threshold"
+								type="number"
+								bind:value={burnRateThreshold}
+								step="0.1"
+								min="0.1"
+							/>
+							<p class="text-xs text-muted-foreground">
+								Fires when both windows burn at or above this multiple of the rate that spends the
+								budget exactly over the SLO window.
+							</p>
+						</div>
+						{#if roundsBurnWindows}
+							<WarningCallout title="Windows are rounded up to whole slices">
+								This SLO is measured in {sloSliceMinutes}-minute slices, so the rule reads the last
+								{windowLabel(roundUpToSlice(shortWindowMinutes))} and {windowLabel(
+									roundUpToSlice(longWindowMinutes)
+								)}.
+							</WarningCallout>
+						{/if}
+					{:else}
+						<div class="space-y-2">
+							<Label for="cfg-budget-consumed">Budget consumed (%)</Label>
+							<Input
+								id="cfg-budget-consumed"
+								type="number"
+								bind:value={consumedPercent}
+								min="1"
+								max="100"
+							/>
+						</div>
+					{/if}
 				{:else if ruleType === 'task_failure_rate'}
 					<div class="space-y-2">
 						<Label for="cfg-task-f">Task Name (* for all)</Label>

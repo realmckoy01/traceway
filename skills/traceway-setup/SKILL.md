@@ -653,15 +653,25 @@ Zero-code path for OpenRouter users: in OpenRouter Settings -> Observability, ad
 
 ## Step 7: Frontend and Mobile
 
-Frontend and mobile projects do NOT use OTel; they use the Traceway SDKs reporting to `/api/report` with connection string `<project-token>@https://<instance>/api/report`.
+Browser and mobile integrations use the Traceway SDKs. Choose the browser SDK generation from the live npm registry, not from SDK versions seen in a source checkout or an assumption that `latest` has moved:
+
+- **Read the dist-tags first**: `npm view @tracewayapp/frontend dist-tags --json`, and the same for the selected wrapper (`@tracewayapp/react`, `vue`, `svelte` or `jquery`). It lists every dist-tag, for example `{"latest": "1.2.2", "beta": "2.0.0-beta.1"}`. Do not query `@tracewayapp/frontend@2`: while 2.x exists only as `2.0.0-beta.N` that range matches nothing and npm exits `E404`, which says nothing about the registry being down.
+- **`latest` is 2.x on every package you need**: stable v2 is published. Install it (`npm install @tracewayapp/react@2`, or the plain package name) and read [frontend-js-v2.md](frontend-js-v2.md).
+- **`latest` is 1.x** (2.x only under `beta`, as today): a new integration installs the stable v1 SDK (`npm install @tracewayapp/react@1`, or the plain package name) and follows [frontend-js.md](frontend-js.md). Use the beta instead only when the user asked for v2 or for remote SDK config (Data Collection, OpAMP), or when the repository already depends on `@tracewayapp/*` `2.x`: then install the version in the `beta` tag (`npm install @tracewayapp/react@beta`) and read [frontend-js-v2.md](frontend-js-v2.md). Never mix v1 and v2 packages, never substitute a local checkout, and never add v2-only options to v1.
+- **An existing integration keeps its major**: a v2 app stays on v2 (`@beta` while 2.x is in beta), and a v1 app is not silently moved to the beta.
+- **The command itself fails** (network, proxy or authentication error, not an answer from the registry): retry once. If it still fails, say that the SDK version could not be verified, keep an existing integration on its current major, and for a new integration ask the user before choosing.
+- v2 exports logs/spans through OTLP, replay through `/api/recordings`, and receives browser-only remote configuration through OpAMP. Keep production defaults; do not turn on `recordAllSessions` merely to prove setup works.
+- **Mobile** SDKs retain their own versioning and `/api/report` transport. The browser-v2 branch and OpAMP controls do not apply to React Native, Flutter, Android, or iOS.
+
+The legacy `<project-token>@https://<instance>/api/report` connection string remains accepted by both browser generations; v2 also accepts the server base URL.
 
 **Browser** (React / Vue / Svelte / jQuery / plain JS), three pieces, all expected:
 
-1. **SDK**: `npm install @tracewayapp/react` (or `vue`, `svelte`, `jquery`, `frontend` for plain JS) and initialize with the connection string (React: wrap the app in `<TracewayProvider connectionString="...">`). Captures errors, web vitals, and session replay.
+1. **SDK**: install the registry-verified version of `@tracewayapp/react` (or `vue`, `svelte`, `jquery`, `frontend` for plain JS) and initialize with the connection string (React: wrap the app in `<TracewayProvider connectionString="...">`). Captures errors, web vitals, and session replay.
 2. **Bundler plugin**: `npm install -D @tracewayapp/bundler-plugin`, then add `tracewayDebugIds()` from `@tracewayapp/bundler-plugin/vite` (or `/rollup`, or `TracewayDebugIdsWebpackPlugin` from `/webpack`) to the bundler config, with source maps enabled (`build.sourcemap: true` / `devtool: "source-map"`).
 3. **Source map upload**: `npm install -D @tracewayapp/sourcemap-upload`, then run `traceway-sourcemaps --url <instance> --token <source-map-upload-token> --directory ./dist` as a postbuild or CI step (env vars: `TRACEWAY_URL`, `TRACEWAY_SOURCEMAP_TOKEN`). The upload token comes from the browser project and is a CI secret, never committed.
 
-For the per-framework init code (plain JS, React, Vue, Svelte/SvelteKit, jQuery), the shared SDK options, error filtering, custom attributes, distributed tracing, and the full debug-ID + source map pipeline, read `frontend-js.md` in this skill directory. Online docs: https://docs.tracewayapp.com/client/react (or `vue`, `svelte`, `jquery`, `js-sdk`).
+For the per-framework init code (plain JS, React, Vue, Svelte/SvelteKit, jQuery), the shared SDK options, error filtering, custom attributes, distributed tracing, and the full debug-ID + source map pipeline, read the version-specific reference selected above (`frontend-js-v2.md` or `frontend-js.md`). Online docs: https://docs.tracewayapp.com/client/react (or `vue`, `svelte`, `jquery`, `js-sdk`).
 
 **Full-stack JS** (Next.js, SvelteKit, Remix): only when "Analyze the Architecture" confirmed the framework's server actually serves the app in production. A frontend-only deployment gets just the browser pieces above; a separate backend follows "Backend OTel Setup". When it is genuinely full-stack, integrate both sides under the two confirmed projects: server side follows "Backend OTel Setup" with the backend project's token, and browser side follows the three pieces above with the frontend project's token. For Next.js specifically, use the `instrumentation.ts` framework hook in the "Next.js server exception" above; never apply the generic Node preload to it.
 

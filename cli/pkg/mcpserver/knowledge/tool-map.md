@@ -45,3 +45,17 @@ Differences from the CLI:
 - No confirmation gate: write tools execute immediately, so only call them on an explicit user request. The MCP client's own tool-approval flow is the confirmation. `--content-file` on the post-mortem commands becomes the `content_md` string param.
 - Login, logout, and profile management are CLI-only (`traceway login` in a terminal); the MCP server uses the credentials stored by the CLI.
 - Shell-piping recipes (`jq` filters) in the knowledge files describe CLI usage; with MCP tools, read the same fields from the structured tool result instead.
+
+OpAMP browser collection: `opamp rules list` maps to `list_sdk_config_rules`; `opamp preview --file client.json` maps to `preview_sdk_config`. These read saved rules and effective settings. Rule mutations require the separate write CLI/server and its write skill.
+
+## Dashboard authoring
+
+| CLI | MCP |
+|---|---|
+| `metrics discover [--name M --key K]` | `discover_metrics` |
+| `dashboards list` | `list_dashboards` |
+| `dashboards library` | `dashboard_library` |
+| `dashboards export <id>` | `export_dashboard` |
+| `traceway-write dashboards import --file F [--mode create\|upsert]` | `import_dashboards` (write only) |
+
+`dashboards validate --file F` is an offline CLI check; both import surfaces run the same validation before writing. For the chart-building workflow, read `traceway://knowledge/dashboard-building` on the write server.

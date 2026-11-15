@@ -18,7 +18,7 @@ Drive a Traceway instance from the terminal with the `traceway` CLI. The first w
 
 > The CLI is under active development. If a flag documented here does not appear in `traceway <command> --help`, trust the binary.
 > If a `traceway` MCP server is connected, prefer its tools over shelling out to the CLI: they wrap the same API with the same semantics, and this skill's knowledge is available as its resources. The server is this same binary (`traceway mcp`).
-> This skill only reads. To change anything (archive issues, acknowledge or resolve pages, snooze alerts, run monitors, write post-mortems), the user installs the separate `traceway-write` CLI and the `traceway-write` skill.
+> This skill only reads. To change anything (archive issues, acknowledge or resolve pages, snooze alerts, run monitors, write post-mortems, change remote SDK config rules), the user installs the separate `traceway-write` CLI and the `traceway-write` skill.
 > When the user asks how a part of Traceway works (schedules, escalation, status pages, alert rules, impact score and the rest), use the `traceway-learn` skill. It is the full product guide.
 
 ## Ground Rules (All Flows)
@@ -106,7 +106,7 @@ These fire from latency/throughput rules, not from an error. There is no hash, n
 | `endpoint_p95_threshold` / `endpoint_p99_threshold` | `P95 latency 1250ms on <endpoint>` · "reached 1250ms over the last N minutes (threshold: 1000ms)" | `/endpoints?from=<iso>&to=<iso>` |
 | `apdex_drop` | `Apdex dropped to 0.62 (threshold: 0.80)` · "across N requests over the last N minutes" | `/endpoints?from=<iso>&to=<iso>` |
 | `impact_score_critical\|high\|medium` | `Endpoint <endpoint> impact became critical` · "impact score: 0.82. Reason: <reason>" | `/endpoints?from=<iso>&to=<iso>` |
-| `metric_threshold` | `Metric <name> is <value> (threshold: gt 100)` | `/metrics?preset=1h` |
+| `metric_threshold` | `Metric <name> is <value> (threshold: gt 100)`, or `Metric <name>{<tag>=<value>} is ...` per breaching series when the rule sets `groupBy` | `/metrics?preset=1h` |
 
 What the body gives you: the **endpoint name** (parse it from the subject/body; it is not a separate field), the **metric/percentile**, the **current value**, the **threshold**, and the **lookback window**. The `/endpoints?from=&to=` link is only a ~3-minute window around the fire time, so treat the fire time as the onset hint, not the incident window.
 
@@ -372,6 +372,8 @@ For free-form requests ("what's broken in prod?", "is /api/checkout slow?", "sho
 | `traceway alerts list` | Alert rules: type, enabled, snoozed until |
 | `traceway monitors list` / `monitors show <id>` | Uptime monitors, their status and incidents |
 | `traceway post-mortems list` / `post-mortems show <id>` | Post-mortem documents; `--search`, `--tag` |
+| `traceway opamp rules list` | Browser projects only: the remote SDK config (OpAMP) rules in order, with conditions, settings and `updatedAt`. Later matching rules win |
+| `traceway opamp preview --file client.json` | The settings document the saved rules give a client described by `{"attributes":{...},"instanceUid":"..."}` (`--file -` reads stdin): matched rules and captures, plan limits applied, config hash. Not proof that a browser applied it |
 | `traceway profiles {list,use}`, `login`, `logout`, `version` | Profile and session management |
 
 The by-id `show`/`occurrence` commands take their id from a dashboard URL, a notification, or an `exceptions show` occurrence — and **require** the record's timestamp (`--recorded-at` / `--started-at`); see "Fast by-id lookups" above.

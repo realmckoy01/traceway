@@ -2,7 +2,7 @@
 
 package telemetry
 
-import ch "github.com/tracewayapp/traceway/backend/app/repositories/telemetry/clickhouse"
+import ch "github.com/tracewayapp/traceway/backend/v2/app/repositories/telemetry/clickhouse"
 
 var (
 	AiTraceRepository             = ch.AiTraceRepository
@@ -18,4 +18,5 @@ var (
 	OtelSpanRepository            = ch.OtelSpanRepository
 	LegacyRepository              = ch.LegacyRepository
 	TaskRepository                = ch.TaskRepository
+	SLOBucketRepository           = ch.SLOBucketRepository
 )

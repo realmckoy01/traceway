@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/tracewayapp/traceway/backend/app/chdb"
-	"github.com/tracewayapp/traceway/backend/app/hooks"
-	"github.com/tracewayapp/traceway/backend/app/models"
-	traceway "go.tracewayapp.com"
+	"github.com/tracewayapp/traceway/backend/v2/app/chdb"
+	"github.com/tracewayapp/traceway/backend/v2/app/hooks"
+	"github.com/tracewayapp/traceway/backend/v2/app/models"
+	"github.com/tracewayapp/traceway/backend/v2/app/traceway"
 )
 
 func evaluateNewError(ctx context.Context, rule *models.NotificationRuleWithChannel, event hooks.ReportEvent) {
@@ -63,12 +63,12 @@ func evaluateNewError(ctx context.Context, rule *models.NotificationRuleWithChan
 			continue
 		}
 
-		projectName := getProjectName(rule.ProjectId)
+		projectName := getProjectName(ctx, rule.ProjectId)
 		msg := buildNewErrorMessage(details, projectName)
 		// Record before dispatch: a persistently failing dispatch retries once
 		// per cooldown window, never on every ingest event.
 		dedup.record(dedupKey)
-		dispatch(rule, msg)
+		dispatch(ctx, rule, msg)
 	}
 }
 
@@ -94,12 +94,12 @@ func evaluateErrorRegression(ctx context.Context, rule *models.NotificationRuleW
 		}
 
 		details := getExceptionDetails(ctx, event.ProjectId, hash)
-		projectName := getProjectName(rule.ProjectId)
+		projectName := getProjectName(ctx, rule.ProjectId)
 		msg := buildErrorRegressionMessage(details, projectName)
 		// Record before dispatch: a persistently failing dispatch retries once
 		// per cooldown window, never on every ingest event.
 		dedup.record(dedupKey)
-		dispatch(rule, msg)
+		dispatch(ctx, rule, msg)
 	}
 }
 

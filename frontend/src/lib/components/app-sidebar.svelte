@@ -3,6 +3,7 @@
 	import { useSidebar } from '$lib/components/ui/sidebar';
 	import { oncallState } from '$lib/state/oncall.svelte';
 	import { monitorsState } from '$lib/state/monitors.svelte';
+	import { slosState } from '$lib/state/slos.svelte';
 	import { organizationContext } from '$lib/state/organization-context.svelte';
 	import {
 		Activity,
@@ -17,6 +18,7 @@
 		Flame,
 		FolderKanban,
 		Gauge,
+		Goal,
 		ListEnd,
 		PhoneCall,
 		Server,
@@ -28,6 +30,7 @@
 	import {
 		projectsState,
 		isFrontendFramework,
+		isBrowserFramework,
 		isCloudflareFramework
 	} from '$lib/state/projects.svelte';
 	import { LayoutDashboard } from '@lucide/svelte';
@@ -46,17 +49,18 @@
 		exact?: boolean;
 	}
 
-	const hiddenForFrontend = new Set([
+	const hiddenForBrowser = new Set([
 		'Dashboard',
-		'Logs',
 		'Endpoints',
 		'Tasks',
-		'Spans',
 		'Profiles',
 		'Dashboards',
 		'AI Traces',
 		'Monitors'
 	]);
+	// Browser projects report through the OpenTelemetry SDK, which exports logs and spans but no
+	// metrics; mobile projects report through the native SDKs, which send neither.
+	const hiddenForMobile = new Set([...hiddenForBrowser, 'Logs', 'Spans']);
 	const hiddenForCloudflare = new Set(['Dashboards']);
 	// Items that only make sense for frontend (browser) projects - dropped from
 	// the sidebar for any other framework, so a Go backend project doesn't
@@ -90,21 +94,25 @@
 			title: 'Monitors',
 			stickyParams: ['preset', 'from', 'to']
 		},
+		{ Icon: Goal, href: '/slos', title: 'SLOs', stickyParams: [] },
 		{ Icon: Bell, href: '/notifications', title: 'Alerts', stickyParams: ['preset', 'from', 'to'] },
 		{ Icon: PhoneCall, href: '/on-call', title: 'On-Call', stickyParams: [] },
 		{ Icon: Link2, href: '/connection', title: 'Connection', stickyParams: [] }
 	];
 
-	const sidebarItems = $derived(
-		projectsState.currentProject && isFrontendFramework(projectsState.currentProject.framework)
-			? allSidebarItems.filter((item) => !hiddenForFrontend.has(item.title))
-			: projectsState.currentProject &&
-				  isCloudflareFramework(projectsState.currentProject.framework)
-				? allSidebarItems.filter(
-						(item) => !hiddenForCloudflare.has(item.title) && !frontendOnly.has(item.title)
-					)
-				: allSidebarItems.filter((item) => !frontendOnly.has(item.title))
-	);
+	const sidebarItems = $derived.by(() => {
+		const framework = projectsState.currentProject?.framework;
+		if (framework && isFrontendFramework(framework)) {
+			const hidden = isBrowserFramework(framework) ? hiddenForBrowser : hiddenForMobile;
+			return allSidebarItems.filter((item) => !hidden.has(item.title));
+		}
+		if (framework && isCloudflareFramework(framework)) {
+			return allSidebarItems.filter(
+				(item) => !hiddenForCloudflare.has(item.title) && !frontendOnly.has(item.title)
+			);
+		}
+		return allSidebarItems.filter((item) => !frontendOnly.has(item.title));
+	});
 
 	const allOrganizationItems: SidebarItem[] = [
 		{
@@ -206,6 +214,9 @@
 				? organizationContext.openPagesCount
 				: oncallState.openPagesCount;
 		}
+		if (item.title === 'SLOs') {
+			return organizationContext.active ? 0 : slosState.breachedCount;
+		}
 		return 0;
 	}
 
@@ -215,11 +226,14 @@
 		const projectId = projectsState.currentProjectId;
 		if (!projectId) return;
 		const hasMonitors = sidebarItems.some((item) => item.title === 'Monitors');
+		const hasSlos = sidebarItems.some((item) => item.title === 'SLOs');
 		oncallState.refreshOpenCount();
 		if (hasMonitors) monitorsState.refreshDownCount();
+		if (hasSlos) slosState.refreshBreachedCount();
 		const interval = setInterval(() => {
 			oncallState.refreshOpenCount();
 			if (hasMonitors) monitorsState.refreshDownCount();
+			if (hasSlos) slosState.refreshBreachedCount();
 		}, 60000);
 		return () => clearInterval(interval);
 	});

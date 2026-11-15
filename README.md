@@ -54,6 +54,7 @@ Traceway is an **OpenTelemetry-native** observability platform. It combines **lo
 - **Session Replay**: Watch what the user did right before the error. Available for web (any JS framework) and Flutter.
 - **AI Observability**: LLM cost, tokens, latency, and full conversations across providers (OpenRouter and any OTel-compatible AI gateway). Calls group into conversations via `gen_ai.conversation.id`, tool calls are parsed from completions and rendered in the chat view, and multi-language content flagging catches conversations containing terms you care about. Per-customer analytics (conversation length, cost per conversation) key on `user.id`: set it to a stable customer identifier such as your account or tenant id, the same value across all of that user's conversations, never a session id.
 - **On-Call & Paging**: Rotation schedules with layers and overrides, escalation policies, and pages that escalate until someone acknowledges. Delivered via email, Slack, Pushover, Telegram, or SMS, with one-click acknowledge links that need no login.
+- **SLOs**: Service level objectives over any indicator Traceway already stores: endpoint availability or latency, any span filter (a queue consumer, an outbound call), task success, monitor uptime, a metric held under a limit per time slice, or crash-free sessions for browser and mobile projects. Rolling 7, 30 or 90 day windows, an error budget, burn rates, and multi-window burn-rate alerts with recovery notices, all computed from precomputed buckets rather than raw scans.
 - **Fleet Overview**: One organization-wide page above every project: each reporting instance with live CPU, memory, disk and network, plus issues, monitors and open pages across all projects. Kubernetes nodes group by cluster, and a single `kubectl apply` instruments a whole cluster.
 
 Plus: background-task (job) monitoring, configurable alerts (Slack / GitHub / email / webhook / Pushover / Telegram), multi-tenant orgs with role-based access, and a per-endpoint slow-threshold override.
@@ -63,7 +64,7 @@ Plus: background-task (job) monitoring, configurable alerts (Slack / GitHub / em
 Your agent sets up Traceway, queries production telemetry, and finds the root cause:
 
 ```bash
-npx skills add tracewayapp/traceway --all
+npx skills add tracewayapp/skills --all
 ```
 
 One command installs all four skills into Claude Code, Cursor, Codex, or any agent that reads `SKILL.md`:
@@ -77,7 +78,7 @@ The [CLI](./cli) is designed for agents first: JSON when piped, tables on a TTY,
 
 Want the agent to act too? Agent write access is opt-in at three levels: a write credential (the separate `traceway-write` CLI, a `tww_` token, or the `/mcp/write` server), an organization admin switch, and the creator's own role. Then an agent can archive issues, acknowledge pages, snooze alerts, run monitors and write post-mortems, and every write lands in an audit log. In Claude Code the `traceway-write` skill is its own plugin (`plugins/tw-write`). [Learn more →](https://docs.tracewayapp.com/learn/agent-write-access)
 
-The skills are plain Markdown in [`skills/`](./skills), in the same MIT-licensed repo. No marketplace, no lock-in. [Learn more →](https://tracewayapp.com/product/agent-skills)
+The skills are plain Markdown in [`skills/`](./skills), MIT-licensed like the rest of Traceway, and every release publishes them to [tracewayapp/skills](https://github.com/tracewayapp/skills), the small repo you install from. No lock-in. [Learn more →](https://tracewayapp.com/product/agent-skills)
 
 <p align="center">
   <img alt="Claude Code fixing a production issue from a Traceway error, end to end" src="./traceway-ai-demo.gif" width="900" />
@@ -124,11 +125,11 @@ Prefer a single container with no external databases? The [SQLite image](https:/
 Run Traceway inside your Go process. No Docker, no external databases, SQLite under the hood:
 
 ```bash
-go get github.com/tracewayapp/traceway/backend
+go get github.com/tracewayapp/traceway/backend/v2
 ```
 
 ```go
-import tracewaybackend "github.com/tracewayapp/traceway/backend"
+import tracewaybackend "github.com/tracewayapp/traceway/backend/v2"
 
 func main() {
     go tracewaybackend.Run(
@@ -141,7 +142,7 @@ func main() {
 }
 ```
 
-Open `http://localhost:8082`, log in, and hit your app to see traces appear. Full walkthrough in the [embedded mode guide](https://docs.tracewayapp.com/learn/embedded-mode), or check the working examples ([OTel exporter](./examples/embedded-backend-otel) or [Go client SDK](./examples/embedded-backend-go-client)).
+Open `http://localhost:8082`, log in, and hit your app to see traces appear. Full walkthrough in the [embedded mode guide](https://docs.tracewayapp.com/learn/embedded-mode), or check the [working example](./examples/embedded-backend-otel).
 
 ## Supported Integrations
 
@@ -246,7 +247,7 @@ A full-stack framework has two halves and two Traceway projects. Next.js and Rem
 | `cli/`      | Agent-first `traceway` command line for querying exceptions, logs, endpoints, and metrics                                                                                                                                              |
 | `skills/`   | Agent skills (`/traceway-setup`, `/traceway`, `/traceway-learn`) for Claude Code, Cursor, Codex, and any SKILL.md-compatible agent                                                                                                                         |
 | `docs/`     | Documentation site (Nextra)                                                                                                                                                                                                             |
-| `examples/` | Working examples: embedded mode ([OTel](./examples/embedded-backend-otel), [Go client](./examples/embedded-backend-go-client)) and OTel-instrumented apps ([Express](./examples/express-otel), [NestJS](./examples/nestjs-otel), [Next.js](./examples/nextjs-otel), [Hono](./examples/hono-otel)) |
+| `examples/` | Working examples: [embedded mode](./examples/embedded-backend-otel) and OTel-instrumented apps ([Express](./examples/express-otel), [NestJS](./examples/nestjs-otel), [Next.js](./examples/nextjs-otel), [Hono](./examples/hono-otel)) |
 | `website/`  | Landing page                                                                                                                                                                                                                            |
 
 ## Build Tags
@@ -300,6 +301,7 @@ Full documentation at **[docs.tracewayapp.com](https://docs.tracewayapp.com)**:
 - [**Embedded Mode**](https://docs.tracewayapp.com/learn/embedded-mode): Run Traceway inside your Go app
 - [**Kubernetes**](https://docs.tracewayapp.com/learn/kubernetes): Instrument a whole cluster with the manifests in [`examples/kubernetes`](./examples/kubernetes)
 - [**Organization Overview**](https://docs.tracewayapp.com/learn/organization-overview): Servers, issues, monitors, and on-call pages across every project, one sidebar click apart
+- [**SLOs**](https://docs.tracewayapp.com/learn/slos): Objectives, error budgets and burn-rate alerting over endpoints, spans, tasks, monitors, metrics and crash-free sessions
 
 ## Community
 

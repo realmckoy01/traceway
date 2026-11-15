@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/tracewayapp/traceway/backend/app/middleware"
+	"github.com/tracewayapp/traceway/backend/v2/app/middleware"
 	collogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	colmetricspb "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
 	colprofilespb "go.opentelemetry.io/proto/otlp/collector/profiles/v1development"
@@ -200,8 +200,11 @@ func decodeLogsRequest(c *gin.Context) (*collogspb.ExportLogsServiceRequest, int
 	return req, len(body), nil
 }
 
-func writeLogsResponse(c *gin.Context) {
+func writeLogsResponse(c *gin.Context, dropped int) {
 	resp := &collogspb.ExportLogsServiceResponse{}
+	if dropped > 0 {
+		resp.PartialSuccess = &collogspb.ExportLogsPartialSuccess{RejectedLogRecords: int64(dropped), ErrorMessage: "Client log rate limit exceeded; excess records discarded"}
+	}
 	if isProtobuf(c) {
 		data, _ := proto.Marshal(resp)
 		c.Data(http.StatusOK, "application/x-protobuf", data)

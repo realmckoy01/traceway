@@ -37,6 +37,12 @@ export const FRONTEND_FRAMEWORKS: Framework[] = [
 	'android',
 	'ios'
 ];
+// Browser frameworks, instrumented by the OpenTelemetry SDK (@tracewayapp/frontend 2.x): it sends logs and
+// spans (no metrics), unlike the mobile SDKs.
+export const BROWSER_FRAMEWORKS: Framework[] = ['react', 'svelte', 'vuejs', 'jquery'];
+// The 2.x SDK is also what takes remote collection settings over OpAMP.
+export const SDK_CONFIG_FRAMEWORKS: Framework[] = BROWSER_FRAMEWORKS;
+
 export const JS_FRAMEWORKS: Framework[] = [
 	'react',
 	'svelte',
@@ -90,6 +96,10 @@ export function isFrontendFramework(fw: Framework): boolean {
 	return FRONTEND_FRAMEWORKS.includes(fw);
 }
 
+export function isBrowserFramework(fw: Framework): boolean {
+	return BROWSER_FRAMEWORKS.includes(fw);
+}
+
 export function isBackendFramework(fw: Framework): boolean {
 	return !isFrontendFramework(fw);
 }
@@ -110,6 +120,21 @@ export function isJsLanguage(lang?: string | null): boolean {
 
 export function isOtelFramework(fw: Framework): boolean {
 	return fw === 'opentelemetry' || fw === 'hono';
+}
+
+// Projects created for the retired Traceway Go SDK. Go instruments with OpenTelemetry now, so they get
+// the same setup guide as an `opentelemetry` project.
+export const LEGACY_GO_FRAMEWORKS: Framework[] = [
+	'gin',
+	'fiber',
+	'chi',
+	'fasthttp',
+	'stdlib',
+	'custom'
+];
+
+export function usesOtelSetupGuide(fw: Framework): boolean {
+	return fw === 'opentelemetry' || LEGACY_GO_FRAMEWORKS.includes(fw);
 }
 
 export function isCloudflareFramework(fw: Framework): boolean {

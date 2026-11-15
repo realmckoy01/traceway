@@ -2,7 +2,7 @@
 
 A **session** is a full recording of one user's interactions with a browser app, typically the lifetime of an open tab. Where an [Issue](/learn/issues) shows you a single moment that something broke, a session shows you the entire journey: what the user clicked, navigated to, scrolled past, and saw on screen, with the same console logs and network calls layered on top.
 
-Sessions are a browser-only concept. They're emitted by the JavaScript SDK and its framework wrappers (React, Vue, Svelte, jQuery) when **always-on session recording** is enabled. Backend and mobile SDKs do not produce sessions.
+Sessions are a browser-only concept, emitted by the JavaScript SDK and its framework wrappers (React, Vue, Svelte, jQuery). The stable 1.x SDK emits them only when **always-on session recording** is enabled (`recordAllSessions: true`). The 2.x SDK (beta) reports every session unless `sessions: false` is set, and keeps the replay on the device until an error, a trigger or a capture asks for it (see [Remote SDK Config](/learn/remote-config)). Backend and mobile SDKs do not produce sessions.
 
 ## Sessions vs. Exception Clips
 
@@ -12,7 +12,7 @@ A session is the larger envelope around those moments:
 
 | | Exception Clip | Session |
 |---|---|---|
-| Default behaviour | On (rolling window flushed with each captured exception) | Off (opt in with `recordAllSessions: true`) |
+| Default behaviour | On (rolling window flushed with each captured exception) | 1.x: off (opt in with `recordAllSessions: true`). 2.x: the session is reported, its full replay is uploaded only with `recordAllSessions: true` or a remote config rule |
 | Scope | Last ~10 s before an exception | Entire tab lifetime, capped at 60 min |
 | Storage | One file per exception | One file per ~30 s segment, many per session |
 | When uploaded | At exception capture | Continuously, every segment rotation |
@@ -22,7 +22,7 @@ Both can coexist: an exception fired during an always-on session gets its inline
 
 ## What a Session Records
 
-The recording uses [rrweb](https://github.com/rrweb-io/rrweb) to capture DOM mutations, input events, mouse movement, and viewport changes. Replay is a faithful reconstruction: text, layout, scrolling, hover states, even mouse trails. Privacy markers (`rr-mask`, `rr-block`, `rr-ignore`) work the same way they do for exception clips. See [Session Replay in the JS SDK guide](/client/js-sdk/session-replay#privacy--masking) for the full masking reference.
+The recording uses [rrweb](https://github.com/rrweb-io/rrweb) to capture DOM mutations, input events, mouse movement, and viewport changes. Replay is a faithful reconstruction: text, layout, scrolling, hover states, even mouse trails. Privacy markers (`rr-mask`, `rr-block`, `rr-ignore`) work the same way they do for exception clips. See [Session Replay in the JS SDK guide](/client/js-sdk/v1/session-replay#privacy--masking) for the full masking reference.
 
 Alongside the rrweb stream, each segment carries:
 
@@ -31,9 +31,13 @@ Alongside the rrweb stream, each segment carries:
 
 The dashboard's session detail page renders these as separate tabs below the player, scrub-synced to the replay timeline.
 
+With the OpenTelemetry-based SDK, `@tracewayapp/frontend` 2.x (in beta), segments carry the recording only. Console lines, navigation, clicks and app events are stored as log records and requests as spans, tagged with the session id, and the session page reads them from there; which of them leave the browser is set per signal by [Remote SDK Config](/learn/remote-config).
+
 ## Session Lifecycle
 
-A session begins automatically when the SDK initializes with `recordAllSessions: true` (or when the page is restored from the bfcache after a back/forward navigation; a fresh `sessionId` is generated each time).
+With the 1.x SDK, a session begins automatically when the SDK initializes with `recordAllSessions: true` (or when the page is restored from the bfcache after a back/forward navigation; a fresh `sessionId` is generated each time).
+
+With the 2.x SDK, a session begins whenever the SDK initializes, `recordAllSessions` or not, unless `sessions: false` is set. The session is kept per tab: a page load in the same tab continues it while it is within the inactivity timeout and the maximum duration below, and starts a new one otherwise.
 
 It ends on the first of:
 
@@ -113,6 +117,6 @@ For most apps, recording a sample of sessions (or only premium-tier users, etc.)
 
 ## Next Steps
 
-- [Session Replay in the JS SDK](/client/js-sdk/session-replay): privacy masking, segment rotation, and the wire format.
+- [Session Replay in the JS SDK](/client/js-sdk/v1/session-replay): privacy masking, segment rotation, and the wire format (1.x). The 2.x SDK (beta) is on [Session Replay](/client/js-sdk/session-replay).
 - [Issues](/learn/issues): how exceptions are grouped and what an issue page shows.
 - [Attributes](/learn/attributes): the broader attribute model that backs sessions, exceptions, traces, and tasks.

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tracewayapp/traceway/backend/app/config"
-	"github.com/tracewayapp/traceway/backend/app/models"
+	"github.com/tracewayapp/traceway/backend/v2/app/config"
+	"github.com/tracewayapp/traceway/backend/v2/app/models"
 )
 
 // dashboardURL makes a dashboard path absolute when APP_BASE_URL is set.
@@ -94,7 +94,7 @@ func buildApdexDropMessage(apdex float64, threshold float64, total int64, window
 	}
 }
 
-func buildMetricThresholdMessage(metricName string, value float64, operator string, threshold float64, aggregation string, window int, projectName string) Message {
+func buildMetricThresholdMessage(metricName string, seriesLabel string, value float64, operator string, threshold float64, aggregation string, window int, projectName string) Message {
 	severity := SeverityWarning
 	diff := value - threshold
 	if diff < 0 {
@@ -106,19 +106,40 @@ func buildMetricThresholdMessage(metricName string, value float64, operator stri
 	if aggregation == "" {
 		aggregation = "avg"
 	}
-	headline := fmt.Sprintf("The metric %s has a %s of %.2f over the last %d minutes which violates the threshold %s %.2f.", metricName, aggregation, value, window, operator, threshold)
+	series := metricName + seriesLabel
+	headline := fmt.Sprintf("The metric %s has a %s of %.2f over the last %d minutes which violates the threshold %s %.2f.", series, aggregation, value, window, operator, threshold)
 	return Message{
-		Subject:    fmt.Sprintf("[%s] Metric %s is %.2f (threshold: %s %.2f)", projectName, metricName, value, operator, threshold),
+		Subject:    fmt.Sprintf("[%s] Metric %s is %.2f (threshold: %s %.2f)", projectName, series, value, operator, threshold),
 		Body:       headline,
 		Severity:   severity,
 		URL:        "/metrics?preset=1h",
-		DedupToken: metricName,
+		DedupToken: series,
+		Email: alertEmail(models.EmailAlert{
+			ProjectName: projectName,
+			Headline:    headline,
+			ScopeLabel:  "Metric",
+			Scope:       series,
+			Observed:    fmt.Sprintf("%s %.2f", aggregation, value),
+			Threshold:   fmt.Sprintf("%s %.2f", operator, threshold),
+			WindowMins:  window,
+		}),
+	}
+}
+
+func buildMetricThresholdOverflowMessage(metricName string, count int, operator string, threshold float64, window int, projectName string) Message {
+	headline := fmt.Sprintf("%d more series of the metric %s violate the threshold %s %.2f over the last %d minutes. Group the metric on the metrics page to see them.", count, metricName, operator, threshold, window)
+	return Message{
+		Subject:    fmt.Sprintf("[%s] Metric %s: %d more series breach the threshold (%s %.2f)", projectName, metricName, count, operator, threshold),
+		Body:       headline,
+		Severity:   SeverityWarning,
+		URL:        "/metrics?preset=1h",
+		DedupToken: metricName + ":overflow",
 		Email: alertEmail(models.EmailAlert{
 			ProjectName: projectName,
 			Headline:    headline,
 			ScopeLabel:  "Metric",
 			Scope:       metricName,
-			Observed:    fmt.Sprintf("%s %.2f", aggregation, value),
+			Observed:    fmt.Sprintf("%d more series", count),
 			Threshold:   fmt.Sprintf("%s %.2f", operator, threshold),
 			WindowMins:  window,
 		}),
@@ -561,5 +582,77 @@ func TestContactMethodMessage() Message {
 			Template: models.EmailTemplateTest,
 			Test:     &models.EmailTest{Target: "on-call contact method"},
 		},
+	}
+}
+
+func buildSLOBurnRateMessage(entity *models.SLO, longBurn, shortBurn float64, longMinutes, shortMinutes int, threshold float64, projectName string) Message {
+	severity := SeverityWarning
+	if longBurn >= threshold*2 {
+		severity = SeverityCritical
+	}
+	headline := fmt.Sprintf("The SLO %q is burning its error budget at %.1fx over the last %s and %.1fx over the last %s (threshold %.1fx).",
+		entity.Name, longBurn, windowLabel(longMinutes), shortBurn, windowLabel(shortMinutes), threshold)
+	return Message{
+		Subject:    fmt.Sprintf("[%s] SLO %q burn rate %.1fx", projectName, entity.Name, longBurn),
+		Body:       headline,
+		Severity:   severity,
+		URL:        fmt.Sprintf("/slos/%d", entity.Id),
+		DedupToken: SLODedupToken(entity.Id),
+		Email: alertEmail(models.EmailAlert{
+			ProjectName: projectName,
+			Headline:    headline,
+			ScopeLabel:  "SLO",
+			Scope:       entity.Name,
+			Observed:    fmt.Sprintf("%.1fx over %s, %.1fx over %s", longBurn, windowLabel(longMinutes), shortBurn, windowLabel(shortMinutes)),
+			Threshold:   fmt.Sprintf("%.1fx", threshold),
+			WindowMins:  longMinutes,
+		}),
+	}
+}
+
+func buildSLOBudgetConsumedMessage(entity *models.SLO, consumed, threshold float64, projectName string) Message {
+	severity := SeverityWarning
+	if consumed >= 100 {
+		severity = SeverityCritical
+	}
+	headline := fmt.Sprintf("The SLO %q has consumed %.1f%% of its %d-day error budget (threshold %.0f%%).", entity.Name, consumed, entity.WindowDays, threshold)
+	subject := fmt.Sprintf("[%s] SLO %q budget %.0f%% consumed", projectName, entity.Name, consumed)
+	if consumed >= 100 {
+		headline = fmt.Sprintf("The SLO %q has exhausted its %d-day error budget: %.0f%% consumed against a threshold of %.0f%%.", entity.Name, entity.WindowDays, consumed, threshold)
+		subject = fmt.Sprintf("[%s] SLO %q error budget exhausted", projectName, entity.Name)
+	}
+	return Message{
+		Subject:    subject,
+		Body:       headline,
+		Severity:   severity,
+		URL:        fmt.Sprintf("/slos/%d", entity.Id),
+		DedupToken: SLODedupToken(entity.Id),
+		Email: alertEmail(models.EmailAlert{
+			ProjectName: projectName,
+			Headline:    headline,
+			ScopeLabel:  "SLO",
+			Scope:       entity.Name,
+			Observed:    fmt.Sprintf("%.1f%% consumed", consumed),
+			Threshold:   fmt.Sprintf("%.0f%%", threshold),
+			WindowMins:  entity.WindowDays * 1440,
+		}),
+	}
+}
+
+func buildSLORecoveredMessage(entity *models.SLO, detail string, projectName string) Message {
+	headline := fmt.Sprintf("The SLO %q recovered. %s", entity.Name, detail)
+	return Message{
+		Subject:    fmt.Sprintf("[%s] SLO %q recovered", projectName, entity.Name),
+		Body:       headline,
+		Severity:   SeverityInfo,
+		Recovered:  true,
+		URL:        fmt.Sprintf("/slos/%d", entity.Id),
+		DedupToken: SLODedupToken(entity.Id),
+		Email: alertEmail(models.EmailAlert{
+			ProjectName: projectName,
+			Headline:    headline,
+			ScopeLabel:  "SLO",
+			Scope:       entity.Name,
+		}),
 	}
 }

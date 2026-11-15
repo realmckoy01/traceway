@@ -18,7 +18,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/tracewayapp/traceway/cli/pkg/mcpserver/knowledge"
+	"github.com/tracewayapp/traceway/cli/v2/pkg/mcpserver/knowledge"
 )
 
 //go:embed skill.tmpl.md
@@ -39,6 +39,7 @@ var learnTopics = []string{
 	"monitors.md",
 	"alerts.md",
 	"on-call.md",
+	"data-collection.md",
 	"organization.md",
 }
 
@@ -66,6 +67,9 @@ func main() {
 
 	writeDir := filepath.Join(root, "plugins", "tw-write", "skills", "traceway-write")
 	write(filepath.Join(writeDir, "SKILL.md"), render(writeSkillTemplate))
+	for _, topic := range []string{"dashboard-building.md", "write-setup.md", "alert-configuration.md", "oncall-configuration.md", "personal-notifications.md", "incident-actions.md", "sdk-configuration.md"} {
+		write(filepath.Join(writeDir, topic), copiedHeader(topic)+knowledge.MustRead(topic))
+	}
 }
 
 func render(text string) string {

@@ -28,7 +28,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"go.opentelemetry.io/otel/trace"
 
-	tracewaybackend "github.com/tracewayapp/traceway/backend"
+	tracewaybackend "github.com/tracewayapp/traceway/backend/v2"
 )
 
 //go:embed index.html
@@ -143,13 +143,17 @@ func main() {
 	// AI chat live in .env.
 	_ = godotenv.Load()
 
+	if err := os.MkdirAll("storage", 0o755); err != nil {
+		panic(fmt.Errorf("create storage directory: %w", err))
+	}
+
 	go tracewaybackend.Run(
 		tracewaybackend.WithSQLitePath("./storage/traceway.db"),
 		tracewaybackend.WithPort(8082),
 		tracewaybackend.WithDefaultUser("admin@localhost.com", "admin"),
 		tracewaybackend.WithDefaultProject("Backend API", "opentelemetry", backendToken),
 		tracewaybackend.WithDefaultProject("jQuery Frontend", "jquery", frontendToken),
-		tracewaybackend.WithDefaultProject("Traceway Monitoring", "gin", monitoringToken),
+		tracewaybackend.WithDefaultProject("Traceway Monitoring", "opentelemetry", monitoringToken),
 		tracewaybackend.WithDefaultProject("Flutter App", "flutter", flutterToken),
 		tracewaybackend.WithDefaultProjectSourceMapToken("Flutter App", flutterUploadToken),
 		tracewaybackend.WithDefaultProject("iOS App", "ios", iosToken),

@@ -5,10 +5,11 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/tracewayapp/traceway/backend/app/db"
-	"github.com/tracewayapp/traceway/backend/app/outbox"
-	"github.com/tracewayapp/traceway/backend/app/synthetics"
-	traceway "go.tracewayapp.com"
+	"github.com/tracewayapp/traceway/backend/v2/app/db"
+	"github.com/tracewayapp/traceway/backend/v2/app/outbox"
+	"github.com/tracewayapp/traceway/backend/v2/app/slo"
+	"github.com/tracewayapp/traceway/backend/v2/app/synthetics"
+	"github.com/tracewayapp/traceway/backend/v2/app/traceway"
 )
 
 type healthDeepController struct{}
@@ -45,6 +46,7 @@ type HealthDeepResponse struct {
 	Engine                     *db.TelemetryEngineStats `json:"engine,omitempty"`
 	Outbox                     *outbox.HealthStats      `json:"outbox,omitempty"`
 	Synthetics                 *synthetics.HealthStats  `json:"synthetics,omitempty"`
+	SLO                        *slo.HealthStats         `json:"slo,omitempty"`
 }
 
 // 503 means the configured telemetry backend is down. On the embedded
@@ -64,16 +66,21 @@ func (h healthDeepController) Get(c *gin.Context) {
 		resp.Engine = &engine
 	}
 	// Best-effort: health must not 500 because the main DB hiccuped.
-	if outboxStats, err := outbox.HealthSnapshot(); err == nil {
+	if outboxStats, err := outbox.HealthSnapshot(c); err == nil {
 		resp.Outbox = outboxStats
 	} else {
 		traceway.CaptureException(fmt.Errorf("failed to load outbox health: %w", err))
 	}
-	if syntheticsStats, err := synthetics.HealthSnapshot(); err == nil {
+	if syntheticsStats, err := synthetics.HealthSnapshot(c); err == nil {
 		resp.Synthetics = syntheticsStats
 	} else {
 		traceway.CaptureException(fmt.Errorf("failed to load synthetics health: %w", err))
 	}
+	sloStats, err := slo.HealthSnapshot(c.Request.Context())
+	if err != nil {
+		traceway.CaptureException(fmt.Errorf("failed to load slo health: %w", err))
+	}
+	resp.SLO = sloStats
 
 	if resp.TelemetryBackend == "clickhouse" && !resp.CHReachable {
 		c.JSON(http.StatusServiceUnavailable, resp)

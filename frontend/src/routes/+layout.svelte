@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import { resolve } from '$app/paths';
 	import './layout.css';
 	import { goto, afterNavigate } from '$app/navigation';
@@ -22,18 +23,38 @@
 	import { Toaster, toast } from 'svelte-sonner';
 	import { page } from '$app/state';
 	import { defaultAuthenticatedPath, gotoHref } from '$lib/utils/navigation';
-	import { setupTraceway } from '@tracewayapp/svelte';
-	import { captureException } from '@tracewayapp/frontend';
+	import { DEFAULT_IGNORE_PATTERNS, captureException, init } from '@tracewayapp/frontend';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import type { Component } from 'svelte';
 	import StatusPageView from '$lib/components/traceway/status-page-view.svelte';
 	import { statusDomainSlug } from '$lib/status-domain';
+	import { shouldMonitorUrl } from '$lib/utils/self-monitoring';
 
-	if (__TRACEWAY_URL__) {
-		setupTraceway({
-			connectionString: __TRACEWAY_URL__
+	let monitoring = false;
+
+	// Starts on the first URL that may be monitored, so a visit that begins on a status page or on a link
+	// carrying a token only starts once it reaches the dashboard, and the public never does.
+	function startMonitoring(url: URL) {
+		if (monitoring || !__TRACEWAY_URL__ || !shouldMonitorUrl(url, statusDomainSlug)) return;
+		monitoring = true;
+		init(__TRACEWAY_URL__, {
+			recordAllSessions: true,
+			// Browser and extension noise with no stack frame in our code.
+			ignoreErrors: [
+				...DEFAULT_IGNORE_PATTERNS,
+				/ResizeObserver loop/,
+				/^(\w+: )?Script error\.?$/,
+				/window\.ethereum/,
+				/The play\(\) request was interrupted/
+			]
 		});
 	}
+
+	if (browser) startMonitoring(new URL(window.location.href));
+
+	$effect(() => {
+		startMonitoring(page.url);
+	});
 
 	let { children } = $props();
 	let showAddProjectModal = $state(false);

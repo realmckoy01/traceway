@@ -9,6 +9,7 @@
 	import { toast } from 'svelte-sonner';
 	import { api } from '$lib/api';
 	import { getCurrentUserFromToken, type ContactMethod } from '$lib/state/oncall.svelte';
+	import { REPLAY_BLOCK_CLASS } from '$lib/utils/self-monitoring';
 
 	interface Props {
 		open: boolean;
@@ -167,6 +168,7 @@
 						id="cm-slack-url"
 						bind:value={slackWebhookUrl}
 						placeholder="https://hooks.slack.com/services/..."
+						class={REPLAY_BLOCK_CLASS}
 						required
 					/>
 				</div>
@@ -185,6 +187,7 @@
 						id="cm-po-user-key"
 						bind:value={pushoverUserKey}
 						placeholder="Your Pushover user key"
+						class={REPLAY_BLOCK_CLASS}
 						required
 					/>
 				</div>
