@@ -25,6 +25,7 @@ export type NotificationChannelConfig = {
 	ttl?: number;
 	botToken?: string;
 	chatId?: string;
+	topicId?: string;
 	policyId?: number | null;
 };
 

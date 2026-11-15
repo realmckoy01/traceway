@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -25,6 +26,7 @@ const telegramTruncationMarker = "\n\n[truncated]"
 type TelegramAdapter struct {
 	BotToken string `json:"botToken"`
 	ChatId   string `json:"chatId"`
+	TopicId  string `json:"topicId,omitempty"`
 }
 
 var telegramBotTokenRe = regexp.MustCompile(`^\d+:[A-Za-z0-9_-]+$`)
@@ -42,6 +44,12 @@ func (a *TelegramAdapter) Validate() error {
 	if strings.TrimSpace(a.ChatId) == "" {
 		return fmt.Errorf("Telegram chat ID is required")
 	}
+	if topicID := strings.TrimSpace(a.TopicId); topicID != "" {
+		id, err := strconv.ParseInt(topicID, 10, 64)
+		if err != nil || id <= 0 {
+			return fmt.Errorf("Telegram topic ID must be a positive integer")
+		}
+	}
 	return nil
 }
 
@@ -50,6 +58,10 @@ func (a *TelegramAdapter) Send(ctx context.Context, msg Message) error {
 		"chat_id":                  {a.ChatId},
 		"text":                     {telegramText(msg)},
 		"disable_web_page_preview": {"true"},
+	}
+
+	if topicID := strings.TrimSpace(a.TopicId); topicID != "" {
+		form.Set("message_thread_id", topicID)
 	}
 
 	endpoint := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", url.PathEscape(strings.TrimSpace(a.BotToken)))

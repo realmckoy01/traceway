@@ -34,6 +34,7 @@
 	let pushoverAppToken = $state('');
 	let telegramBotToken = $state('');
 	let telegramChatId = $state('');
+	let telegramTopicId = $state('');
 	let smsPhoneNumber = $state('');
 
 	const accountEmail = getCurrentUserFromToken()?.email ?? '';
@@ -64,6 +65,7 @@
 		pushoverAppToken = config.appToken ?? '';
 		telegramBotToken = config.botToken ?? '';
 		telegramChatId = config.chatId ?? '';
+		telegramTopicId = config.topicId ?? '';
 		smsPhoneNumber = config.phoneNumber ?? '';
 		error = '';
 	});
@@ -86,7 +88,11 @@
 		if (methodType === 'sms') {
 			return { phoneNumber: smsPhoneNumber.trim() };
 		}
-		return { botToken: telegramBotToken, chatId: telegramChatId };
+		return {
+			botToken: telegramBotToken,
+			chatId: telegramChatId,
+			...(telegramTopicId.trim() ? { topicId: telegramTopicId.trim() } : {})
+		};
 	}
 
 	async function handleSubmit() {
@@ -210,6 +216,14 @@
 						bind:value={telegramChatId}
 						placeholder="Destination user or group ID"
 						required
+					/>
+				</div>
+				<div class="space-y-2">
+					<Label for="cm-tg-topic-id">Topic ID (optional)</Label>
+					<Input
+						id="cm-tg-topic-id"
+						bind:value={telegramTopicId}
+						placeholder="Destination forum topic ID"
 					/>
 				</div>
 			{:else if methodType === 'sms'}

@@ -63,6 +63,7 @@
 	let pushoverTtl = $state(0);
 	let telegramBotToken = $state('');
 	let telegramChatId = $state('');
+	let telegramTopicId = $state('');
 	let escalationPolicyId = $state<number | null>(null);
 	let escalationPolicies = $state<{ id: number; name: string }[]>([]);
 	let escalationPoliciesLoaded = $state(false);
@@ -131,6 +132,7 @@
 		pushoverTtl = 0;
 		telegramBotToken = '';
 		telegramChatId = '';
+		telegramTopicId = '';
 		escalationPolicyId = null;
 		escalationPoliciesLoaded = false;
 	}
@@ -180,6 +182,7 @@
 		} else if (ch.channelType === 'telegram') {
 			telegramBotToken = config.botToken || '';
 			telegramChatId = config.chatId || '';
+			telegramTopicId = config.topicId || '';
 		} else if (ch.channelType === 'escalation') {
 			escalationPolicyId = config.policyId ?? null;
 		}
@@ -244,7 +247,8 @@
 		} else if (channelType === 'telegram') {
 			return {
 				botToken: telegramBotToken,
-				chatId: telegramChatId
+				chatId: telegramChatId,
+				...(telegramTopicId.trim() ? { topicId: telegramTopicId.trim() } : {})
 			};
 		} else if (channelType === 'escalation') {
 			return { policyId: escalationPolicyId };
@@ -598,6 +602,14 @@
 						bind:value={telegramChatId}
 						placeholder="Destination user or group ID"
 						required
+					/>
+				</div>
+				<div class="space-y-2">
+					<Label for="tg-topic-id">Topic ID (optional)</Label>
+					<Input
+						id="tg-topic-id"
+						bind:value={telegramTopicId}
+						placeholder="Destination forum topic ID"
 					/>
 				</div>
 			{:else if channelType === 'escalation'}

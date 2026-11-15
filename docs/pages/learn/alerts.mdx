@@ -23,7 +23,7 @@ A channel represents a notification destination. Traceway supports the following
 | GitLab  | Creates a GitLab issue in a project | Instance URL, access token, project ID or path, optional labels |
 | GitHub  | Creates a GitHub issue in a repository | Personal access token, repository owner/name, optional labels |
 | Pushover | Sends push notifications to your mobile devices | User Key, App Token |
-| Telegram | Sends a message via a Telegram bot to a user or group chat | Bot Token, Chat ID |
+| Telegram | Sends a message via a Telegram bot to a user or group chat | Bot Token, Chat ID, optional Topic ID |
 | Escalation policy | Opens an on-call [page](/learn/on-call) and runs the policy's escalation chain until somebody acknowledges, instead of sending a message | Escalation policy |
 
 Each channel has a **Test** button that sends a sample notification so you can verify the configuration before attaching rules. Escalation-policy channels are the exception: their Test button opens a real [page](/learn/on-call) and notifies the on-call responder, so resolve the test page when you are done.
@@ -107,6 +107,7 @@ Then configure the Telegram channel in Traceway:
 |-------|----------|-------------|
 | Bot Token | Yes | The token BotFather gave you |
 | Chat ID | Yes | The destination channel ID (e.g. `-1001234567890`) |
+| Topic ID | No | A positive integer identifying a forum topic. Leave blank to send without targeting a topic. |
 
 ### Webhook Payload
 
